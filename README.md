@@ -29,6 +29,7 @@
 опцию `«Read and write permissions»` и поставь галочку в чекбоксе. Это
 необходимо для автоматизации процесса деплоя проекта.
 
+
 ![Settings GitHub Actions permissions step 2](./assets/gh-actions-perm-2.png)
 
 Теперь у тебя есть личный репозиторий проекта, со структурой файлов и папок
