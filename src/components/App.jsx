@@ -1,96 +1,86 @@
-import { useState, useEffect } from 'react';
-import { fetchImages } from './services/Api';
-import { Searchbar } from './Searchbar/Searchbar';
-import { Loader } from './Loader/Loader';
-import { ImageGallery } from './ImageGallery/ImageGallery';
-import { Button } from './Button/Button';
-// import { animateScroll } from 'react-scroll';
-import { Modal } from './Modal/Modal';
+import { useEffect, useState, useCallback } from "react";
+import axios from "axios";
+import styles from 'components/App.module.css';
+import { params } from "tools/params";
+import {Searchbar} from './Searchbar/Searchbar';
+import {ImageGallery} from './ImageGallery/ImageGallery';
+import {Loader} from './Loader/Loader';
+import {Button} from './Button/Button';
+import {Modal} from './Modal/Modal';
 
 export const App = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+
   const [images, setImages] = useState([]);
-  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState('');
+  const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [loadMore, setLoadMore] = useState(false);
-  const [error, setError] = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [largeImageURL, setLargeImageURL] = useState('');
-  
-  const per_page = 12;
+  const [imageId, setImageId] = useState('');
+  const [page, setPage] = useState('');
 
-  useEffect(() => {
-    getImages(searchQuery, page);
-  }, [searchQuery, page]);
-
-  const getImages = async (searchQuery, page) => {
-    if (!searchQuery) {
-      return;
-    }
-    setIsLoading(true);
-
-    try {
-      const { hits, totalHits } = await fetchImages(searchQuery, page);
-      if (hits.length === 0) {
-        return alert('Sorry, nothing found 🤷‍♂️');
-      }
-      console.log(hits, totalHits);
-      setImages(prevImages => [...prevImages, ...hits]);
-      setLoadMore(page < Math.ceil(totalHits / per_page));
-    } catch (error) {
-      setError({ error });
+  const getImages = useCallback(async () => {
+    if (page > 0)
+    {try {
+      setIsLoading(true)
+      const {data} = await axios.get('https://pixabay.com/api/', {
+        params: {
+          q: search,
+          page: page,
+          ...params
+        }});
+      const {hits} = data;
+      const newImages = hits.map((hit) => 
+      {return {id: hit.id, webformatURL: hit.webformatURL, tags: hit.tags, largeImageURL: hit.largeImageURL}})
+      setImages(prevImages => [...prevImages, ...newImages]);
+      setTotal(data.total);
+      } catch (error) {
+      console.error(error);
     } finally {
-      setIsLoading(false);
-    }
-  };
+      setIsLoading(false)
+    }}
+  }, [search, page])
 
-  const formSubmit = searchQuery => {
-    setSearchQuery(searchQuery);
+  const handleLoadMore = () => {
+    setPage(page + 1)
+  }
+
+  const handleSubmitSearch = (event) => {
+    event.preventDefault();
     setImages([]);
     setPage(1);
-    setLoadMore(false);
-  };
+    setSearch(event.target.text.value);
+  }
 
-  const onloadMore = () => {
-    setIsLoading(true);
-    setPage(prevPage => prevPage + 1);
-    // scrollOnMoreButton();
-  };
+  const handleModalOpen = (event) => {
+    setImageId(event.target.id);
+  }
 
-  // const scrollOnMoreButton = () => {
-  //   animateScroll.scrollToBottom({
-  //     duration: 1000,
-  //     delay: 10,
-  //     smooth: 'linear',
-  //   });
-  // };
+  const handleModalClose = (event) => {
+    if (event.target === event.currentTarget || event.key === 'Escape') {
+      setImageId('');
+    }
+  }
 
-  const openModal = largeImageURL => {
-    console.log(largeImageURL);
-    setShowModal(true);
-    setLargeImageURL(largeImageURL);
-  };
+  useEffect(() => {
+    getImages()
+  }, [getImages]) 
 
-  const closeModal = () => {
-    setShowModal(false);
-  };
+  useEffect(() => {
+    const interval = setInterval(() => {
+      window.scrollBy(0, 10)
+      if (document.documentElement.clientHeight + window.pageYOffset === document.body.offsetHeight) {
+          clearInterval(interval)}
+  }, 10)}, [images])
 
-  return (
-    <>
-      <Searchbar onSubmit={formSubmit} />
-      {isLoading ? (
-        <Loader />
-      ) : (
-        <ImageGallery images={images} openModal={openModal} />
-      )}
-      {error && <p>something wrong</p>}
+  const filterById = () => {
+    const filteredImages = images.filter(image => Number(image.id) === Number(imageId))
+    return filteredImages[0];
+  }
 
-      {loadMore && <Button onloadMore={onloadMore} page={page} />}
-
-      {showModal && (
-        <Modal largeImageURL={largeImageURL} onClose={closeModal} />
-      )}
-    </>
-  );
-  // }
+  return <div className={styles.app}>
+    <Searchbar onSubmitSearch={handleSubmitSearch}/>
+    {images.length > 0 && <ImageGallery images={images} modalOpen={handleModalOpen}/>}
+    {isLoading && <Loader/>}
+    {!isLoading && images.length < total && images.length > 0 && <Button loadMore={handleLoadMore}/>}
+    {imageId && <Modal image={filterById()} close={handleModalClose}/>}
+  </div>
 };
